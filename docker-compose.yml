@@ -1,0 +1,107 @@
+version: "3"
+
+services:
+
+zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    ports:
+     - '2181:2181'
+    environment:
+      ALLOW_ANONYMOUS_LOGIN=yes
+
+kafka:
+    image: 'bitnami/kafka:latest'
+
+    ports:
+      - '9092:9092'
+      - '9093:9093'
+    environment:
+      KAFKA_BROKER_ID=1
+      KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
+      KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+      ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      zookeeper
+
+spark:
+    image: docker.io/bitnami/spark:3
+    environment:
+      SPARK_MODE=master
+      SPARK_RPC_AUTHENTICATION_ENABLED=no
+      SPARK_RPC_ENCRYPTION_ENABLED=no
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      SPARK_SSL_ENABLED=no
+    ports:
+      '8080:8080'
+
+spark-worker:
+    image: docker.io/bitnami/spark:3
+    environment:
+      SPARK_MODE=worker
+      SPARK_MASTER_URL=spark://spark:7077
+      SPARK_WORKER_MEMORY=1G
+      SPARK_WORKER_CORES=1
+      SPARK_RPC_AUTHENTICATION_ENABLED=no
+      SPARK_RPC_ENCRYPTION_ENABLED=no
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      SPARK_SSL_ENABLED=no
+
+my_sql_db:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+
+    environment:
+
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_USERNAME: root
+      MYSQL_DATABASE: sentiment_analysis
+
+adminer:
+    image: adminer
+    restart: always
+    ports:
+      - '8080:8080'
+
+kibana:
+    image: 'bitnami/kibana:latest'
+    networks:
+      - app-tier
+myapp:
+    image: 'kibana'
+    networks:
+      - app-tier
+
+elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.5.2
+    container_name: es01
+    environment:
+      node.name=es01
+      cluster.name=es-docker-cluster
+      discovery.seed_hosts=es02,es03
+      cluster.initial_master_nodes=es01,es02,es03
+      bootstrap.memory_lock=true
+      "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data01:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - elastic
+
+# #Commandes à lancer dans le terminal pour :
+# --> docker-compose build
+# toutes les images seront créés
+# --> docker-compose up -d 
+# construit et fait tourner les images et conteneurs
+# --> docker-compose stop  : pour arreter les images
+# --> docker-compose pull : met a jour les images 
